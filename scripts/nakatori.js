@@ -2,7 +2,8 @@
 const MOD = "nakatori-extension";
 const SAN_INPUT_NAME = "system.attribs.san.value";
 const SAN_VALUE_PATH = "system.attribs.san.value"; 
-const SAN_MAX_PATH   = "system.attribs.san.max"
+const SAN_MAX_PATH   = "system.attribs.san.max";
+const HP_MAX_PATH    = "system.attribs.hp.max";
 
 // Setup hooks
 Hooks.once("init", () => console.log("Nakatori | init"));
@@ -20,6 +21,13 @@ Hooks.once("ready", async () => {
     if (hasCurse === undefined) {
       await actor.setFlag(MOD, "curse.value", 0);
     }
+    
+    // Init HP auto calc off
+    const hpAuto = foundry.utils.getProperty(actor, "system.attribs.hp.auto");
+    if (hpAuto === false) continue;
+    await actor.update({
+      "system.attribs.hp.auto": false
+    }, { nakatoriSync: true });
   }
 });
 
@@ -123,4 +131,24 @@ Hooks.on("renderActorSheet", (app, html) => {
 
     app.render(false);
   });
+});
+
+
+
+// Edit HP Formula
+Hooks.on("preUpdateActor", (actor, updateData, options) => {
+  if (options?.nakatoriSync) return;
+
+  const con =
+    foundry.utils.getProperty(updateData, "system.characteristics.con.value") ??
+    foundry.utils.getProperty(actor, "system.characteristics.con.value");
+
+  const siz =
+    foundry.utils.getProperty(updateData, "system.characteristics.siz.value") ??
+    foundry.utils.getProperty(actor, "system.characteristics.siz.value");
+
+  console.log(`Nakatori | Setting HP max to ${con*2 + siz} (CON: ${con}, SIZ: ${siz})`);
+
+  foundry.utils.setProperty(updateData, HP_MAX_PATH, Math.floor((con*2 + siz) / 10));
+  
 });

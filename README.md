@@ -13,3 +13,11 @@ game.actors.contents.map(a => ({
   curse: a.getFlag("nakatori-extension", "curse.value")
 }))
 ```
+#### Get hp of all actors
+```
+game.actors.contents.map(a => ({
+  name: a.name,
+  hp: a.system.attribs.hp.value,
+  hpMax: a.system.attribs.hp.max
+}))
+```
