@@ -7,9 +7,12 @@
     "name": "Mrivu"
     }
   ],
-  "version": "0.0.1",
+  "version": "0.0.2",
   "compatibility": {
     "minimum": "13",
     "verified": "13"
-  }
+  },
+
+  "esmodules": ["scripts/nakatori.js"], 
+  "systems": ["CoC7"]
 }
