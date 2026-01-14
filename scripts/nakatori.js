@@ -21,6 +21,12 @@ Hooks.once("ready", async () => {
     if (hasCurse === undefined) {
       await actor.setFlag(MOD, "curse.value", 0);
     }
+
+    const hasRadiance = actor.getFlag(MOD, "radiance.value");
+
+    if (hasRadiance === undefined) {
+      await actor.setFlag(MOD, "radiance.value", true);
+    }
     
     // Init HP auto calc off
     const hpAuto = foundry.utils.getProperty(actor, "system.attribs.hp.auto");
@@ -276,5 +282,94 @@ Hooks.on("renderActorSheet", (app, html) => {
     used = normalizeUsedArray(max, used);
     await setProwess(actor, { max, used });
     renderNodes();
+  });
+});
+
+// Remove Residence and Birthplace
+Hooks.on("renderActorSheet", (app, html) => {
+  html.find('input[name="system.infos.residence"]').closest(".detail-wrapper").remove();
+  html.find('input[name="system.infos.birthplace"]').closest(".detail-wrapper").remove();
+});
+
+// Add Radiance
+Hooks.on("renderActorSheet", (app, html) => {
+  const actor = app.actor;
+  if (!actor) return;
+
+  if (html.find(".nakatori-radiance").length) return;
+
+  const $portrait = html.find(".derived-attributes-bottom-line").first();
+
+  const $anchor = $portrait;
+  if (!$anchor.length) return;
+
+  const radianceStatus = actor.getFlag(MOD, "radiance.value") ?
+    "modules/nakatori-extension/images/RadianceToken.png" :
+    "modules/nakatori-extension/images/NoRadianceToken.png";
+  const $radiance = $(`
+  <section class="nakatori-radiance"
+    style="
+      margin: 0.35rem 0;
+      display: inline-flex;
+      flex-direction: column;
+      gap: 0.2rem;
+      background: transparent !important;
+      border: none !important;
+      box-shadow: none !important;
+      padding: 0 !important;
+      width: fit-content;
+      max-width: 100%;
+    ">
+    <div class="nakatori-radiance-header"
+      style="
+        display:flex;
+        align-items:center;
+        gap:0.5rem;
+        background: transparent !important;
+        border: none !important;
+      ">
+      <span style="font-weight:700;">RADIANCE</span>
+      <div class="nakatori-radiance-nodes"
+        style="display:flex; gap:0.25rem; flex-wrap:wrap; direction:ltr;">
+      </div>
+    </div>
+
+    <button type="button" class="nakatori-radiance-image"
+      title="Radiance"
+      style="
+        border: 0 !important;
+        outline: 0 !important;
+        box-shadow: none !important;
+        background: transparent !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        align-self: flex-start;
+        cursor: pointer;
+      ">
+      <img
+        src="${radianceStatus}"
+        style="
+          width: 55px;
+          height: auto;
+          display: block;
+          border: 0 !important;
+          outline: 0 !important;
+          box-shadow: none !important;
+        "
+      />
+    </button>
+  </section>
+  `);
+  $anchor.after($radiance);
+  $radiance.find(".nakatori-radiance-image")
+  .off("click.nakatori")
+  .on("click.nakatori", async (ev) => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    ev.stopImmediatePropagation();
+
+    const actorRadiance = actor.getFlag(MOD, "radiance.value") ?? false;
+    await actor.setFlag(MOD, "radiance.value", !actorRadiance);
+    app.render(false);
   });
 });

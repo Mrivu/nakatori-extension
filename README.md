@@ -29,3 +29,10 @@ game.actors.contents.map(a => ({
   hpMax: a.system.attribs.hp.max
 }))
 ```
+#### Get Radiance of all actors
+```
+game.actors.contents.map(a => ({
+  name: a.name,
+  radiance: a.getFlag("nakatori-extension", "radiance.value")
+}))
+```
