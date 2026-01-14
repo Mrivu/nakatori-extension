@@ -99,6 +99,24 @@ Hooks.on("renderActorSheet", (app, html) => {
 });
 
 
+// Roll with Curse instead of Sanity
+Hooks.on("init", () => {
+  const oldGetRollData = Actor.prototype.getRollData;
+
+  Actor.prototype.getRollData = function () {
+    const data = oldGetRollData.call(this);
+
+    const curse = this.getFlag(MOD, "curse.value") ?? 0;
+    const sanTarget = curse;
+
+    if (data?.attribs?.san) data.attribs.san.value = sanTarget;
+    if (data?.system?.attribs?.san) data.system.attribs.san.value = sanTarget;
+
+    return data;
+  };
+});
+
+
 // SAN loss -> Curse gain
 Hooks.on("renderActorSheet", (app, html) => {
   const actor = app.actor;
@@ -151,4 +169,112 @@ Hooks.on("preUpdateActor", (actor, updateData, options) => {
 
   foundry.utils.setProperty(updateData, HP_MAX_PATH, Math.floor((con*2 + siz) / 10));
   
+});
+
+
+// Prowess tracking
+function getProwess(actor) {
+  const max = actor.getFlag(MOD, "prowess.max") ?? 0;
+  const used = actor.getFlag(MOD, "prowess.used") ?? [];
+  return { max: Number(max) || 0, used: Array.isArray(used) ? used : [] };
+}
+
+async function setProwess(actor, { max, used }) {
+  await actor.update({
+    [`flags.${MOD}.prowess.max`]: Math.min(10, max),
+    [`flags.${MOD}.prowess.used`]: used
+  }, { nakatoriInternal: true });
+}
+
+function normalizeUsedArray(max, used) {
+  const arr = used.slice(0, max);
+  while (arr.length < max) arr.push(false);
+  return arr;
+}
+
+Hooks.on("renderActorSheet", (app, html) => {
+  const actor = app.actor;
+  if (!actor) return;
+
+  if (html.find(".nakatori-prowess").length) return;
+
+  const $resourceRow =
+    html.find(".attribute-row, .derived-attributes, .attributes, .resource-row").first();
+
+  const $insertBefore = $resourceRow.length ? $resourceRow : html.find("form").first();
+
+  let { max, used } = getProwess(actor);
+  used = normalizeUsedArray(max, used);
+
+  const $prowess = $(`
+    <section class="nakatori-prowess" style="margin: 0.4rem 0;">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:0.5rem;">
+        <div style="display:flex; align-items:center; gap:0.5rem;">
+          <span style="font-weight:700;">PRW</span>
+          <div class="nakatori-prowess-nodes" style="display:flex; gap:0.25rem; flex-wrap:wrap;"></div>
+        </div>
+        <div style="display:flex; gap:0.05rem;">
+          <button type="button" class="nakatori-prowess-minus" title="Decrease nodes">−</button>
+          <button type="button" class="nakatori-prowess-plus" title="Increase nodes">+</button>
+        </div>
+      </div>
+    </section>
+  `);
+
+  $insertBefore.before($prowess);
+
+  const $nodes = $prowess.find(".nakatori-prowess-nodes");
+
+  function renderNodes() {
+    $nodes.empty();
+    for (let i = 0; i < max; i++) {
+      const isUsed = !!used[i];
+
+      const $node = $(`<button type="button" class="nakatori-prowess-node" data-idx="${i}"
+        title="Toggle node"
+        style="
+          width: 14px; height: 14px; border-radius: 5px !important;
+          border: 1px solid rgba(0,0,0,0.35);
+          ${isUsed ? "opacity:1.00;" : "opacity:0.30; background-color:rgba(226, 244, 33, 0.15);"}
+        ">
+      </button>`);
+
+      $nodes.append($node);
+    }
+  }
+
+  renderNodes();
+
+  $prowess.off(".nakatoriProwess");
+  $prowess.on("click.nakatoriProwess", ".nakatori-prowess-node", async (ev) => {
+    const idx = Number(ev.currentTarget.dataset.idx);
+    if (!Number.isFinite(idx)) return;
+
+    used = normalizeUsedArray(max, used);
+
+    const toggled = !used[idx];
+
+    for (let i = 0; i < max; i++) {
+      if (i < idx) used[i] = true;
+      else if (i > idx) used[i] = false;
+      else used[i] = toggled;
+    }
+
+    await setProwess(actor, { max, used });
+    renderNodes();
+  });
+
+  $prowess.on("click.nakatoriProwess", ".nakatori-prowess-plus", async () => {
+    max = Math.min(10, Math.max(0, max + 1));
+    used = normalizeUsedArray(max, used);
+    await setProwess(actor, { max, used });
+    renderNodes();
+  });
+
+  $prowess.on("click.nakatoriProwess", ".nakatori-prowess-minus", async () => {
+    max = Math.min(10, Math.max(0, max - 1));
+    used = normalizeUsedArray(max, used);
+    await setProwess(actor, { max, used });
+    renderNodes();
+  });
 });
